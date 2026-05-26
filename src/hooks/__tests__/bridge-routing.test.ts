@@ -2086,7 +2086,7 @@ $ ultrawork search the codebase`,
 
         flushPendingWrites();
 
-        const trackingPath = join(tempDir, '.omc', 'state', 'subagent-tracking.json');
+        const trackingPath = join(tempDir, '.omc', 'state', 'sessions', 'test-session-858-subagent', 'subagent-tracking-state.json');
         expect(existsSync(trackingPath)).toBe(true);
 
         const tracking = JSON.parse(readFileSync(trackingPath, 'utf-8')) as {

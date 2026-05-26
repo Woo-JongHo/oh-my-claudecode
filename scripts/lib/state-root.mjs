@@ -1,3 +1,5 @@
+// Thin delegator → src/lib/worktree-paths.ts::resolveSessionStatePaths. DO NOT reimplement here.
+
 /**
  * State Root Resolver (ESM)
  *
@@ -17,6 +19,7 @@
  */
 
 import { join, basename } from 'path';
+import { existsSync } from 'fs';
 import { createHash } from 'crypto';
 import { pathToFileURL } from 'url';
 
@@ -47,4 +50,41 @@ export async function resolveOmcStateRoot(directory) {
     return join(customDir, `${dirName}-${hash}`);
   }
   return join(directory, '.omc');
+}
+
+/**
+ * Resolve session-scoped state paths for a given directory, state name, and session ID.
+ * Delegates to resolveSessionStatePaths() in dist/lib/worktree-paths.js.
+ *
+ * @param {string} directory - Worktree root directory
+ * @param {string} stateName - State name (e.g., "ralph", "ultrawork")
+ * @param {string} [sessionId] - Optional session identifier
+ * @returns {Promise<{readPath: string, writePath: string}>} Unbranded path pair
+ */
+export async function resolveSessionStatePathsForHook(directory, stateName, sessionId) {
+  const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
+  if (pluginRoot) {
+    try {
+      const { resolveSessionStatePaths } = await import(
+        pathToFileURL(join(pluginRoot, 'dist', 'lib', 'worktree-paths.js')).href
+      );
+      const result = resolveSessionStatePaths(stateName, sessionId, directory);
+      return { readPath: result.effectiveRead, writePath: result.effectiveWrite };
+    } catch {
+      // dist not built or unavailable — fall through to inline fallback
+    }
+  }
+
+  // Inline fallback: basic session-scoped path derivation (production always uses dist above)
+  const omcRoot = await resolveOmcStateRoot(directory);
+  const normalizedName = stateName.endsWith('-state') ? stateName : `${stateName}-state`;
+  const legacy = join(omcRoot, 'state', `${normalizedName}.json`);
+  if (!sessionId) {
+    return { readPath: legacy, writePath: legacy };
+  }
+  const sessionScoped = join(omcRoot, 'state', 'sessions', sessionId, `${normalizedName}.json`);
+  // effectiveRead probes the session-scoped file first and falls back to the
+  // legacy path when it does not exist yet (mirrors resolveSessionStatePaths).
+  const readPath = existsSync(sessionScoped) ? sessionScoped : legacy;
+  return { readPath, writePath: sessionScoped };
 }

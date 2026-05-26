@@ -30,6 +30,7 @@
     "./skills/external-context/",
     "./skills/hud/",
     "./skills/learner/",
+    "./skills/local-build-reminder/",
     "./skills/mcp-setup/",
     "./skills/omc-doctor/",
     "./skills/omc-reference/",
