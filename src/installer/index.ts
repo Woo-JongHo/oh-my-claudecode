@@ -1313,11 +1313,12 @@ function renderCompactPluginSkillShim(skillDirName: string, content: string): st
     ?? `Invoke the ${skillDirName} OMC skill.`;
   const description = normalizeCompactSkillDescription(rawDescription);
   const fullBodyRelPath = `../../${PLUGIN_FULL_SKILL_BODIES_DIR}/${skillDirName}/SKILL.md`;
+  const fullBodyPluginRootPath = `\${CLAUDE_PLUGIN_ROOT}/${PLUGIN_FULL_SKILL_BODIES_DIR}/${skillDirName}/SKILL.md`;
 
   frontmatter = upsertYamlStringField(frontmatter, 'description', description);
   frontmatter = upsertYamlStringField(frontmatter, 'omc-full-body', fullBodyRelPath);
 
-  return `---\n${frontmatter.trim()}\n---\n\n${PLUGIN_COMPACT_SKILL_SHIM_MARKER}\n\n# ${skillDirName}\n\nThis is a compact Claude Code plugin registry shim. It keeps startup skill descriptions small while preserving the full OMC skill body for on-demand invocation.\n\nWhen this skill is invoked, read and follow the full bundled instructions from:\n\n\`${fullBodyRelPath}\`\n\nResolve that path relative to this SKILL.md file. If needed, locate the active plugin root via \`CLAUDE_PLUGIN_ROOT\` or \`OMC_PLUGIN_ROOT\` and open \`${PLUGIN_FULL_SKILL_BODIES_DIR}/${skillDirName}/SKILL.md\`.\n`;
+  return `---\n${frontmatter.trim()}\n---\n\n${PLUGIN_COMPACT_SKILL_SHIM_MARKER}\n\n# ${skillDirName}\n\nThis is a compact Claude Code plugin registry shim. It keeps startup skill descriptions small while preserving the full OMC skill body for on-demand invocation.\n\nWhen this skill is invoked, read and follow the full bundled instructions from the active plugin root path:\n\n\`${fullBodyPluginRootPath}\`\n\nIf \`CLAUDE_PLUGIN_ROOT\` is unavailable, resolve \`${fullBodyRelPath}\` relative to the directory containing this SKILL.md file, not relative to the SKILL.md file path itself.\n`;
 }
 
 export function compactPluginSkillPayload(targetRoot: string): { compacted: number; totalBytes: number; errors: string[] } {

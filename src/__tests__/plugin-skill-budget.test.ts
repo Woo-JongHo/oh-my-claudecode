@@ -82,7 +82,10 @@ describe('plugin skill context budget gate (issues #2943, #2986)', () => {
         const source = readFileSync(join(SKILLS_DIR, skillDir, 'SKILL.md'), 'utf-8');
 
         expect(Buffer.byteLength(shim), `${skillDir} compact shim size`).toBeLessThan(COMPACT_PLUGIN_SKILL_PER_FILE_BUDGET_BYTES);
-        expect(shim, `${skillDir} shim should point to archived body`).toContain(`../../skill-bodies/${skillDir}/SKILL.md`);
+        expect(shim, `${skillDir} shim should prefer plugin root archived body`).toContain(`\${CLAUDE_PLUGIN_ROOT}/skill-bodies/${skillDir}/SKILL.md`);
+        expect(shim, `${skillDir} shim should retain relative fallback metadata`).toContain(`../../skill-bodies/${skillDir}/SKILL.md`);
+        expect(shim, `${skillDir} shim fallback should be directory-relative`).toContain('relative to the directory containing this SKILL.md file, not relative to the SKILL.md file path itself');
+        expect(shim, `${skillDir} shim should not contain ambiguous path wording`).not.toContain('relative to this SKILL.md file');
         expect(shim, `${skillDir} shim should expose runtime body override`).toContain('omc-full-body:');
         expect(archived, `${skillDir} full skill body should be preserved`).toBe(source);
       }
