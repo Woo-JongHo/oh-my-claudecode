@@ -17,6 +17,7 @@ import type {
 } from "../shared/types.js";
 import {
   CANONICAL_TEAM_ROLES,
+  CURSOR_EXECUTOR_TEAM_ROLES,
   KNOWN_AGENT_NAMES,
 } from "../shared/types.js";
 import { getConfigDir } from "../utils/paths.js";
@@ -165,6 +166,9 @@ export function buildDefaultConfig(): PluginConfig {
     team: {
       ops: {},
       roleRouting: {},
+    },
+    autopilot: {
+      execution: "solo",
     },
     planOutput: {
       directory: ".omc/plans",
@@ -483,6 +487,7 @@ function warnOnDeprecatedDelegationRouting(config: PluginConfig): void {
  * Throws a descriptive error naming offending key + allowed values.
  */
 const CANONICAL_TEAM_ROLE_SET = new Set<string>(CANONICAL_TEAM_ROLES);
+const CURSOR_EXECUTOR_TEAM_ROLE_SET = new Set<string>(CURSOR_EXECUTOR_TEAM_ROLES);
 const KNOWN_AGENT_NAME_SET = new Set<string>(KNOWN_AGENT_NAMES);
 // /team CLI workers — codex/gemini/grok/cursor here are CLI integrations, NOT the deprecated MCP delegationRouting providers.
 const TEAM_ROLE_PROVIDERS = new Set(["claude", "codex", "gemini", "grok", "cursor"]);
@@ -557,6 +562,11 @@ export function validateTeamConfig(config: PluginConfig): void {
           `[OMC] team.roleRouting.${rawRoleKey}.provider: invalid value "${String(spec.provider)}". Allowed: ${[...TEAM_ROLE_PROVIDERS].join(", ")}`,
         );
       }
+      if (spec.provider === "cursor" && !CURSOR_EXECUTOR_TEAM_ROLE_SET.has(normalized)) {
+        throw new Error(
+          `[OMC] team.roleRouting.${rawRoleKey}.provider: cursor is only supported for executor-style roles (${[...CURSOR_EXECUTOR_TEAM_ROLE_SET].join(", ")})`,
+        );
+      }
     }
 
     if (spec.model !== undefined && !isValidModelValue(spec.model)) {
@@ -569,6 +579,64 @@ export function validateTeamConfig(config: PluginConfig): void {
       if (typeof spec.agent !== "string" || !KNOWN_AGENT_NAME_SET.has(spec.agent)) {
         throw new Error(
           `[OMC] team.roleRouting.${rawRoleKey}.agent: unknown agent "${String(spec.agent)}". Allowed: ${[...KNOWN_AGENT_NAME_SET].join(", ")}`,
+        );
+      }
+    }
+  }
+}
+
+const AUTOPILOT_EXECUTION_BACKENDS = new Set(["team", "solo"]);
+const AUTOPILOT_PLANNING_MODES = new Set(["ralplan", "direct"]);
+const AUTOPILOT_TEAM_AGENT_TYPES = new Set([
+  "claude",
+  "codex",
+  "gemini",
+  "grok",
+  "cursor",
+]);
+
+export function validateAutopilotConfig(config: PluginConfig): void {
+  const autopilot = (config as Record<string, unknown>).autopilot as
+    | Record<string, unknown>
+    | undefined;
+  if (!autopilot || typeof autopilot !== "object") return;
+
+  if (
+    autopilot.execution !== undefined &&
+    (typeof autopilot.execution !== "string" ||
+      !AUTOPILOT_EXECUTION_BACKENDS.has(autopilot.execution))
+  ) {
+    throw new Error(
+      `[OMC] autopilot.execution: invalid value "${String(autopilot.execution)}". Allowed: ${[...AUTOPILOT_EXECUTION_BACKENDS].join(", ")}`,
+    );
+  }
+
+  if (
+    autopilot.planning !== undefined &&
+    autopilot.planning !== false &&
+    (typeof autopilot.planning !== "string" ||
+      !AUTOPILOT_PLANNING_MODES.has(autopilot.planning))
+  ) {
+    throw new Error(
+      `[OMC] autopilot.planning: invalid value "${String(autopilot.planning)}". Allowed: ralplan, direct, false`,
+    );
+  }
+
+  const team = autopilot.team as Record<string, unknown> | undefined;
+  if (!team || typeof team !== "object") return;
+
+  if (team.agentTypes !== undefined) {
+    if (!Array.isArray(team.agentTypes)) {
+      throw new Error("[OMC] autopilot.team.agentTypes: must be an array");
+    }
+
+    for (const agentType of team.agentTypes) {
+      if (
+        typeof agentType !== "string" ||
+        !AUTOPILOT_TEAM_AGENT_TYPES.has(agentType)
+      ) {
+        throw new Error(
+          `[OMC] autopilot.team.agentTypes: invalid value "${String(agentType)}". Allowed: ${[...AUTOPILOT_TEAM_AGENT_TYPES].join(", ")}`,
         );
       }
     }
@@ -647,6 +715,7 @@ export function loadConfig(): PluginConfig {
   // Validate /team role routing post-merge. Throws on invalid shape,
   // walking the parsed object so deepMerge bypasses surface here.
   validateTeamConfig(config);
+  validateAutopilotConfig(config);
 
   return config;
 }
@@ -1092,6 +1161,52 @@ export function generateConfigSchema(): object {
                 fallback: { type: "array", items: { type: "string" } },
               },
               required: ["provider", "tool"],
+            },
+          },
+        },
+      },
+      autopilot: {
+        type: "object",
+        description: "/autopilot pipeline and team execution configuration",
+        properties: {
+          planning: {
+            anyOf: [
+              { type: "string", enum: ["ralplan", "direct"] },
+              { type: "boolean", enum: [false] },
+            ],
+            default: "ralplan",
+          },
+          execution: {
+            type: "string",
+            enum: ["team", "solo"],
+            default: "solo",
+          },
+          verification: {
+            anyOf: [
+              {
+                type: "object",
+                properties: {
+                  engine: { type: "string", enum: ["ralph"] },
+                  maxIterations: { type: "integer", minimum: 1 },
+                },
+                required: ["engine", "maxIterations"],
+              },
+              { type: "boolean", enum: [false] },
+            ],
+          },
+          qa: { type: "boolean", default: true },
+          team: {
+            type: "object",
+            properties: {
+              agentTypes: {
+                type: "array",
+                items: {
+                  type: "string",
+                  enum: ["claude", "codex", "gemini", "grok", "cursor"],
+                },
+                description:
+                  "Preferred CLI worker types for executor-style autopilot team execution tasks",
+              },
             },
           },
         },

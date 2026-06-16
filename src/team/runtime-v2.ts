@@ -85,7 +85,7 @@ import {
 import { formatOmcCliInvocation } from '../utils/omc-cli-rendering.js';
 import { createSwallowedErrorLogger } from '../lib/swallowed-error.js';
 import type { CanonicalTeamRole, PluginConfig, RoleAssignment, TeamRoleAssignmentSpec } from '../shared/types.js';
-import { CANONICAL_TEAM_ROLES } from '../shared/types.js';
+import { CANONICAL_TEAM_ROLES, CURSOR_EXECUTOR_TEAM_ROLES } from '../shared/types.js';
 import { loadConfig } from '../config/loader.js';
 import { buildResolvedRoutingSnapshot, getRoleRoutingSpec } from './stage-router.js';
 import { routeTaskToRole } from './role-router.js';
@@ -269,7 +269,7 @@ const MONITOR_SIGNAL_STALE_MS = 30_000;
  * Returns the primary assignment by default; callers swap to the Claude
  * fallback if the primary provider's CLI binary is missing at spawn time.
  */
-function resolveTaskAssignment(
+export function resolveTaskAssignment(
   task: { subject: string; description: string; role?: string },
   resolvedRouting: Record<CanonicalTeamRole, { primary: RoleAssignment; fallback: RoleAssignment }>,
   roleRoutingConfig: Partial<Record<CanonicalTeamRole, TeamRoleAssignmentSpec>> | undefined,
@@ -297,7 +297,15 @@ function resolveTaskAssignment(
     roleRoutingConfig as Record<string, TeamRoleAssignmentSpec | undefined> | undefined,
     canonical,
   );
+  if (fallbackAgent === 'cursor' && CURSOR_EXECUTOR_TEAM_ROLES.includes(canonical as typeof CURSOR_EXECUTOR_TEAM_ROLES[number])) {
+    return { agentType: fallbackAgent, model: '', role: canonical };
+  }
   if (!hasExplicitRole && !hasConfigForRole) {
+    if (fallbackAgent === 'cursor' && !CURSOR_EXECUTOR_TEAM_ROLES.includes(canonical as typeof CURSOR_EXECUTOR_TEAM_ROLES[number])) {
+      throw new Error(
+        `Cursor workers are executor-style only; inferred role "${canonical}" for task "${task.subject}" must run on a native Claude/OMC reviewer agent or another supported CLI worker.`,
+      );
+    }
     return { agentType: fallbackAgent, model: '', role: canonical };
   }
 

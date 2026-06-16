@@ -161,6 +161,7 @@ Enable Claude Code native teams in `~/.claude/settings.json`:
 omc team 2:codex "review auth module for security issues"
 omc team 2:gemini "redesign UI components for accessibility"
 omc team 1:claude "implement the payment flow"
+omc team 1:cursor "implement the payment flow"
 omc team status auth-review
 omc team shutdown auth-review
 ```
@@ -178,10 +179,24 @@ For mixed Codex + Gemini work in one command, use the **`/ccg`** skill (routes v
 | `omc team N:codex "..."`  | N Codex CLI panes        | Code review, security analysis, architecture |
 | `omc team N:gemini "..."` | N Gemini CLI panes       | UI/UX design, docs, large-context tasks      |
 | `omc team N:grok "..."`   | N Grok Build CLI panes   | Code review, analysis cross-check            |
+| `omc team N:cursor "..."` | N Cursor agent panes     | Executor-style implementation tasks          |
 | `omc team N:claude "..."` | N Claude CLI panes       | General tasks via Claude CLI in tmux         |
 | `/ccg`                    | /ask codex + /ask gemini | Tri-model advisor synthesis                  |
 
-Workers spawn on-demand and die when their task completes — no idle resource usage. Requires `codex` / `gemini` CLIs installed and an active tmux session.
+Workers spawn on-demand and die when their task completes — no idle resource usage. Requires the selected CLI (`codex`, `gemini`, `grok`, or `cursor-agent`) installed/authenticated and an active tmux session.
+
+Autopilot can prefer Cursor executor workers during team execution via `.claude/omc.jsonc`:
+
+```jsonc
+{
+  "autopilot": {
+    "execution": "team",
+    "team": { "agentTypes": ["cursor"] }
+  }
+}
+```
+
+This config makes the autopilot execution stage use `omc team 1:cursor "..."` or `/omc-teams 1:cursor "..."` for executor-style implementation work. Reviewer, critic, security-review, validation verdict, and final approval roles remain native Claude/OMC reviewer roles; Cursor requires an installed/authenticated `cursor-agent`.
 
 Native team worker worktrees are being added behind an opt-in/config gate. See [Native Team Worktree Mode](docs/TEAM-WORKTREE-MODE.md) for the workspace contract, canonical state-root rules, dirty-worktree preservation policy, and verification checklist.
 

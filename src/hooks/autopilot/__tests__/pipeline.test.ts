@@ -473,3 +473,65 @@ describe('Pipeline Orchestrator (with state)', () => {
     });
   });
 });
+
+describe('autopilot team CLI worker configuration', () => {
+  it('preserves requested Cursor worker types in pipeline config', () => {
+    const config = resolvePipelineConfig({
+      execution: 'team',
+      team: { agentTypes: ['cursor'] },
+    });
+
+    expect(config.execution).toBe('team');
+    expect(config.team?.agentTypes).toEqual(['cursor']);
+  });
+
+  it('does not imply team execution from team agentTypes alone', () => {
+    const config = resolvePipelineConfig({
+      team: { agentTypes: ['cursor'] },
+    });
+
+    expect(config.execution).toBe('solo');
+    expect(config.team?.agentTypes).toEqual(['cursor']);
+  });
+
+  it('instructs team execution to use omc team for Cursor executor workers', () => {
+    const prompt = executionAdapter.getPrompt({
+      idea: 'test',
+      directory: '/tmp',
+      planPath: '.omc/plans/autopilot-impl.md',
+      config: {
+        ...DEFAULT_PIPELINE_CONFIG,
+        execution: 'team',
+        team: { agentTypes: ['cursor'] },
+      },
+    });
+
+    expect(prompt).toContain('CLI Team Runtime Required');
+    expect(prompt).toContain('omc team 1:cursor');
+    expect(prompt).toContain('/omc-teams 1:cursor');
+    expect(prompt).toContain('executor-style only');
+    expect(prompt).toContain('reviewer, critic, security-review, validation verdict');
+    expect(prompt).toContain('cursor-agent');
+    expect(prompt).toContain('installed and authenticated');
+    expect(prompt).not.toContain('TeamCreate');
+    expect(prompt).not.toContain('team_name');
+    expect(prompt).not.toContain('debugger` with');
+    expect(prompt).not.toContain('test-engineer` with');
+  });
+
+  it('keeps native TeamCreate guidance for Claude-only team execution', () => {
+    const prompt = executionAdapter.getPrompt({
+      idea: 'test',
+      directory: '/tmp',
+      config: {
+        ...DEFAULT_PIPELINE_CONFIG,
+        execution: 'team',
+        team: { agentTypes: ['claude'] },
+      },
+    });
+
+    expect(prompt).toContain('TeamCreate');
+    expect(prompt).toContain('team_name');
+    expect(prompt).not.toContain('CLI Team Runtime Required');
+  });
+});
