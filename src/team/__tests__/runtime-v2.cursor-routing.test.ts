@@ -23,6 +23,28 @@ describe('runtime-v2 Cursor task assignment guard', () => {
     expect(assignment).toEqual({ agentType: 'cursor', model: '', role: 'executor' });
   });
 
+  it('keeps unowned cursor build-test-fix executor contexts on cursor', () => {
+    const cases = [
+      'fix failing tests',
+      'fix the build error',
+      'debug the failing test runner',
+      'refactor the parser implementation',
+      'verify tests after patching the build',
+    ];
+
+    for (const description of cases) {
+      const assignment = resolveTaskAssignment(
+        { subject: description, description },
+        resolvedRouting,
+        undefined,
+        binaries,
+        'cursor',
+      );
+
+      expect(assignment).toEqual({ agentType: 'cursor', model: '', role: 'executor' });
+    }
+  });
+
   it('keeps explicit cursor executor tasks on cursor', () => {
     const assignment = resolveTaskAssignment(
       { subject: 'Executor task', description: 'apply the implementation plan', role: 'executor' },
