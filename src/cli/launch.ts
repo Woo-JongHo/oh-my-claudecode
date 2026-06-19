@@ -768,7 +768,9 @@ export async function launchCommand(args: string[]): Promise<void> {
   // Pre-flight: check claude CLI availability
   if (!isClaudeAvailable()) {
     console.error('[omc] Error: claude CLI not found. Install Claude Code first:');
-    console.error('  npm install -g @anthropic-ai/claude-code');
+    console.error('  macOS/Linux/WSL: curl -fsSL https://claude.ai/install.sh | bash');
+    console.error('  Windows PowerShell: irm https://claude.ai/install.ps1 | iex');
+    console.error('  More options: https://code.claude.com/docs/en/setup');
     process.exit(1);
   }
 

@@ -16,7 +16,7 @@ If you're new to Oh My ClaudeCode (OMC), follow the steps below in order.
 
 ### Prerequisites
 
-- [Claude Code](https://docs.anthropic.com/claude-code) must be installed
+- [Claude Code](https://code.claude.com/docs/en/setup) must be installed with a current supported method; the native installer is recommended and upstream deprecates npm installation for Claude Code itself.
 - Claude Max/Pro subscription or an Anthropic API key is required
 
 ---
@@ -83,7 +83,7 @@ setup omc
 
 | Item | Requirement |
 |------|-------------|
-| Claude Code | Must be installed |
+| Claude Code | Must be installed with a current supported method; native installer recommended |
 | Authentication | Claude Max/Pro subscription or `ANTHROPIC_API_KEY` environment variable |
 
 ### Choosing a setup scope

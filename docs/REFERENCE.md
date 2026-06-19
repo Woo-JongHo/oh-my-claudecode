@@ -53,7 +53,7 @@ The npm package exposes both `oh-my-claudecode` and `omc`; examples prefer `omc`
 
 ### Requirements
 
-- [Claude Code](https://docs.anthropic.com/claude-code) installed
+- [Claude Code](https://code.claude.com/docs/en/setup) installed with a current supported method; the native installer is recommended and upstream deprecates npm installation for Claude Code itself.
 - One of:
   - **Claude Max/Pro subscription** (recommended for individuals)
   - **Anthropic API key** (`ANTHROPIC_API_KEY` environment variable)
