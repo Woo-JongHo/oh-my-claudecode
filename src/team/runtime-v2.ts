@@ -60,7 +60,7 @@ import type { CliAgentType } from './model-contract.js';
 import {
   buildWorkerArgv, getContract, resolveValidatedBinaryPath,
   getWorkerEnv as getModelWorkerEnv, isPromptModeAgent, getPromptModeArgs,
-  resolveClaudeWorkerModel,
+  resolveClaudeWorkerModel, assertHeadlessSupported, isHeadlessSupportedOnPlatform,
 } from './model-contract.js';
 import {
   createTeamSession, spawnWorkerInPane, sendToWorker, killTeamSession,
@@ -332,6 +332,17 @@ export function resolveTaskAssignment(
     return { agentType: fallbackAgent, model: '', role: canonical };
   }
 
+  // Explicit provider + explicit role with NO per-role routing config: the user
+  // named the provider directly on the worker spec (e.g. `1:antigravity:executor`
+  // or `1:gemini:reviewer`), so honor that provider and treat the role as the
+  // prompt role, not a routing key. Without this, an explicit role would always
+  // opt into resolved_routing, whose default executor primary is Claude — silently
+  // launching Claude instead of the requested CLI provider. When `team.roleRouting`
+  // *is* configured for the role, that deliberate config still wins (below).
+  if (hasExplicitRole && !hasConfigForRole && fallbackAgent !== 'claude') {
+    return { agentType: fallbackAgent, model: '', role: canonical };
+  }
+
   const pair = resolvedRouting[canonical];
   if (!pair) {
     return { agentType: fallbackAgent, model: '', role: canonical };
@@ -359,6 +370,11 @@ function shouldUseLaunchTimeCliResolution(reason: string): boolean {
 }
 
 function resolvePreflightBinaryPath(agentType: CliAgentType): { path: string; degraded: boolean; reason?: string } {
+  // Treat a platform-unsupported headless provider (e.g. antigravity on Windows)
+  // as unavailable during preflight, so role routing falls back cleanly to Claude
+  // instead of recording the binary and failing mid-spawn. Throws here are caught
+  // by startTeamV2's preflight loop and recorded as missingBinaryReasons.
+  assertHeadlessSupported(agentType);
   try {
     return { path: resolveValidatedBinaryPath(agentType), degraded: false };
   } catch (err) {
@@ -703,6 +719,11 @@ async function spawnV2Worker(opts: SpawnV2WorkerOptions): Promise<SpawnV2WorkerR
         || process.env.OMC_GEMINI_DEFAULT_MODEL
         || undefined;
     }
+    if (opts.agentType === 'antigravity') {
+      return process.env.OMC_EXTERNAL_MODELS_DEFAULT_ANTIGRAVITY_MODEL
+        || process.env.OMC_ANTIGRAVITY_DEFAULT_MODEL
+        || undefined;
+    }
     if (opts.agentType === 'grok') {
       return process.env.OMC_EXTERNAL_MODELS_DEFAULT_GROK_MODEL
         || process.env.OMC_GROK_DEFAULT_MODEL
@@ -723,7 +744,7 @@ async function spawnV2Worker(opts: SpawnV2WorkerOptions): Promise<SpawnV2WorkerR
     model: modelForAgent,
   });
 
-  // For prompt-mode agents (currently gemini), keep the full instruction in
+  // For prompt-mode agents (gemini, antigravity), keep the full instruction in
   // inbox.md and pass only a short file-pointer prompt via CLI args. This
   // avoids echoing reviewer/seed prompt text into tmux scrollback.
   if (usePromptMode) {
@@ -972,7 +993,22 @@ export async function startTeamV2(config: StartTeamV2Config): Promise<TeamRuntim
   // Validate CLIs and pin absolute binary paths for user-declared agentTypes.
   // AC-8: missing/untrusted binaries fall back to the snapshot's Claude tuple at
   // spawn time; emit a loud warning naming the binary so operators can fix it.
-  const agentTypes = config.agentTypes as CliAgentType[];
+  // Rewrite headless-unsupported direct workers (e.g. antigravity on Windows) to
+  // the Claude fallback up front, BEFORE any team state or tmux session is created.
+  // Direct launches like `omc team 1:antigravity` flow through `agentTypes` as the
+  // round-robin fallbackAgent for resolveTaskAssignment, so without this they would
+  // pass the unsupported provider through and only fail mid-spawn. (Role-routed
+  // primaries are handled separately by resolvePreflightBinaryPath's guard.)
+  const declaredAgentTypes = config.agentTypes as CliAgentType[];
+  const agentTypes = declaredAgentTypes.map((t): CliAgentType => {
+    if (!isHeadlessSupportedOnPlatform(t)) {
+      process.stderr.write(
+        `[team/runtime-v2] ${t} headless mode is unsupported on this platform — using claude fallback for direct workers\n`,
+      );
+      return 'claude';
+    }
+    return t;
+  });
   const resolvedBinaryPaths: Partial<Record<CliAgentType, string>> = {};
   const missingBinaryReasons: Array<{ agentType: CliAgentType; reason: string }> = [];
   for (const agentType of [...new Set(agentTypes)]) {

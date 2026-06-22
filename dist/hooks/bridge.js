@@ -895,7 +895,7 @@ function getPromptText(input) {
     return "";
 }
 function isExplicitAskSlashInvocation(promptText) {
-    return /^\s*\/(?:oh-my-claudecode:)?ask\s+(?:claude|codex|gemini|grok|cursor)\b/i.test(promptText);
+    return /^\s*\/(?:oh-my-claudecode:)?ask\s+(?:claude|codex|gemini|antigravity|agy|grok|cursor)\b/i.test(promptText);
 }
 function activateRalplanStartupState(directory, sessionId) {
     const now = new Date().toISOString();
@@ -1244,7 +1244,8 @@ async function processKeywordDetector(input) {
                 break;
             case "codex":
             case "gemini":
-            case "cursor": {
+            case "cursor":
+            case "antigravity": {
                 const teamStartCommand = formatOmcCliInvocation(`team start --agent ${keywordType} --count N --task "<task from user message>"`);
                 messages.push(`[MAGIC KEYWORD: team]\n` +
                     `User intent: delegate to ${keywordType} CLI workers via ${formatOmcCliInvocation('team')}.\n` +
