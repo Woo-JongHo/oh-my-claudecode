@@ -7,17 +7,18 @@
  *
  * Claude Code stores a project's transcripts under
  * `~/.claude/projects/<encoded>` where `<encoded>` is the project's absolute
- * path with path separators, dots, and the Windows drive colon all replaced
- * by `-`. For example:
+ * path with **every character that is not an ASCII letter or digit** replaced
+ * by `-` (path separators, dots, the Windows drive colon, and also underscores,
+ * spaces, and non-ASCII characters). For example:
  *
- *   POSIX:    /home/me/proj      -> -home-me-proj
- *   POSIX:    /home/me/my.proj   -> -home-me-my-proj
- *   Windows:  C:\Users\me\proj   -> C--Users-me-proj
+ *   POSIX:    /home/me/proj        -> -home-me-proj
+ *   POSIX:    /home/me/my.proj     -> -home-me-my-proj
+ *   POSIX:    /home/me/00_proj     -> -home-me-00-proj
+ *   Windows:  C:\Users\me\proj     -> C--Users-me-proj
  *
- * Dropping the dot or the drive colon produces a name that never matches the
- * real directory, so any lookup keyed on the encoded name (e.g. worktree
- * transcript resolution) silently finds nothing.
+ * Any character left unconverted produces a name that never matches the real
+ * directory, so any lookup keyed on the encoded name silently finds nothing.
  */
 export function encodeProjectPath(projectPath) {
-  return projectPath.replace(/[/\\.:]/g, '-');
+  return projectPath.replace(/[^a-zA-Z0-9]/g, '-');
 }
