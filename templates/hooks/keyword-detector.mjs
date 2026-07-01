@@ -546,6 +546,23 @@ function hasDirectInvocationPrefix(text, position) {
   return /^\s*(?:[$/!]\s*|force:\s*|oh-my-(?:claudecode|codex):\s*)?$/i.test(prefix);
 }
 
+function hasConversationalInvocationNearKeyword(text, position, _keywordLength, _keywordText) {
+  if (isWithinQuotedSpan(text, position)) {
+    return false;
+  }
+
+  const start = Math.max(0, position - INFORMATIONAL_CONTEXT_WINDOW);
+  const prefix = stripQuotedSpans(text.slice(start, position));
+  const conversationalInvocationPatterns = [
+    /\bplease\s+$/i,
+    /\blet['’]?s\s+$/i,
+    /\bi\s+(?:want|need|would\s+like)\s+(?:a|an)\s+$/i,
+    /\b(?:can|could|would|will)\s+you\s+$/i,
+  ];
+
+  return conversationalInvocationPatterns.some((pattern) => pattern.test(prefix));
+}
+
 function hasExplicitInvocationContext(text, position, keywordLength, keywordText) {
   if (hasDirectInvocationPrefix(text, position)) {
     return true;
@@ -554,7 +571,11 @@ function hasExplicitInvocationContext(text, position, keywordLength, keywordText
   const start = Math.max(0, position - INFORMATIONAL_CONTEXT_WINDOW);
   const end = Math.min(text.length, position + keywordLength + INFORMATIONAL_CONTEXT_WINDOW);
   const context = text.slice(start, end);
-  return hasActivationIntentNearKeyword(context, keywordText);
+  if (hasActivationIntentNearKeyword(context, keywordText)) {
+    return true;
+  }
+
+  return hasConversationalInvocationNearKeyword(text, position, keywordLength, keywordText);
 }
 
 function hasDiagnosticIntentNearKeyword(context, keyword) {
@@ -655,6 +676,9 @@ function isInformationalKeywordContext(text, position, keywordLength, keywordTex
 
   if (keywordText) {
     if (hasActivationIntentNearKeyword(context, keywordText)) {
+      return false;
+    }
+    if (hasConversationalInvocationNearKeyword(text, position, keywordLength, keywordText)) {
       return false;
     }
     if (isRalphUltraworkMetaOrBanterContext(context, keywordText)) {

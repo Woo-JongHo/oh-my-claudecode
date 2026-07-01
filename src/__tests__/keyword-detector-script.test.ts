@@ -719,6 +719,54 @@ diff --git a/a b/b
     expect(existsSync(join(cwd, '.omc', 'state', 'sessions', sessionId, 'autopilot-state.json'))).toBe(false);
   });
 
+  // Regression (issue #3382): an informational/reference occurrence of a
+  // keyword earlier in the same prompt must not suppress a later directive
+  // occurrence of that same keyword.
+  it('activates ralph for a later directive after an earlier informational mention', () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'keyword-detector-info-then-directive-'));
+    const sessionId = 'session-info-then-directive-3382';
+    const output = runKeywordDetector(
+      'The old docs call ralph deprecated. Please ralph and fix the flaky tests.',
+      cwd,
+      sessionId,
+    );
+    const context = output.hookSpecificOutput?.additionalContext ?? '';
+
+    expect(output.continue).toBe(true);
+    expect(context).toContain('[MAGIC KEYWORD: RALPH]');
+    expect(existsSync(join(cwd, '.omc', 'state', 'sessions', sessionId, 'ralph-state.json'))).toBe(true);
+  });
+
+  it('does not activate ralph for an informational mention followed by a quoted please phrase', () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'keyword-detector-quoted-please-ralph-'));
+    const sessionId = 'session-quoted-please-ralph-3382';
+    const output = runKeywordDetector(
+      'The docs say ralph is triggered by the phrase "please ralph".',
+      cwd,
+      sessionId,
+    );
+    const context = output.hookSpecificOutput?.additionalContext ?? '';
+
+    expect(output.continue).toBe(true);
+    expect(context).not.toContain('[MAGIC KEYWORD: RALPH]');
+    expect(existsSync(join(cwd, '.omc', 'state', 'sessions', sessionId, 'ralph-state.json'))).toBe(false);
+  });
+
+  it('does not activate autopilot for an informational mention followed by a quoted please phrase', () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'keyword-detector-quoted-please-autopilot-'));
+    const sessionId = 'session-quoted-please-autopilot-3382';
+    const output = runKeywordDetector(
+      'The docs say autopilot is triggered by the phrase "please autopilot".',
+      cwd,
+      sessionId,
+    );
+    const context = output.hookSpecificOutput?.additionalContext ?? '';
+
+    expect(output.continue).toBe(true);
+    expect(context).not.toContain('[MAGIC KEYWORD: AUTOPILOT]');
+    expect(existsSync(join(cwd, '.omc', 'state', 'sessions', sessionId, 'autopilot-state.json'))).toBe(false);
+  });
+
   // Regression (issue #3380, repo-owner review bot finding against the round-1
   // fix commit): a bug-report/discussion prompt that describes fixing this
   // exact false positive, and happens to contain an execution-directive verb
